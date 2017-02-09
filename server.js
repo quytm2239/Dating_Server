@@ -24,26 +24,26 @@ var port = 1234;
 var code_db_error = 1000;
 var code_success = 200;
 
-var code_null_invalid_email 				= 2001;
-var code_null_invalid_password 				= 2002;
-var code_null_invalid_full_name 			= 2003;
-var code_null_invalid_status 				= 2004;
-var code_null_invalid_gender 				= 2005;
-var code_null_invalid_avatar 				= 2006;
-var code_null_invalid_birthday 				= 2007;
-var code_null_invalid_lat_long 				= 2008;
-var code_null_invalid_address 				= 2009;
-var code_null_invalid_phone 				= 2010;
-var code_null_invalid_profile_description 	= 2011;
+var code_null_invalid_email	= 2001;
+var code_null_invalid_password	= 2002;
+var code_null_invalid_full_name	= 2003;
+var code_null_invalid_status	= 2004;
+var code_null_invalid_gender	= 2005;
+var code_null_invalid_avatar	= 2006;
+var code_null_invalid_birthday	= 2007;
+var code_null_invalid_lat_long	= 2008;
+var code_null_invalid_address	= 2009;
+var code_null_invalid_phone	= 2010;
+var code_null_invalid_profile_description	= 2011;
 
-var code_duplicate_email 					= 2012;
-var code_duplicate_full_name 				= 2013;
+var code_duplicate_email	= 2012;
+var code_duplicate_full_name	= 2013;
 
-var code_wrong_old_password 				= 2014;
+var code_wrong_old_password	= 2014;
 
-var code_not_exist_email 					= 2015;
-var code_not_exist_profile 					= 2016;
-var code_not_exist_status 					= 2017;
+var code_not_exist_email	= 2015;
+var code_not_exist_profile	= 2016;
+var code_not_exist_status	= 2017;
 
 function errorMessage(code) {
 	var mess;
