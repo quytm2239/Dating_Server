@@ -24,23 +24,26 @@ var port = 1234;
 var code_db_error = 1000;
 var code_success = 200;
 
-var code_null_invalid_email 	= 2001;
-var code_null_invalid_password 	= 2002;
-var code_null_invalid_full_name = 2003;
-var code_null_invalid_gender 	= 2004;
-var code_null_invalid_avatar 	= 2005;
-var code_null_invalid_birthday 	= 2006;
-var code_null_invalid_lat_long 	= 2007;
-var code_null_invalid_address 	= 2008;
+var code_null_invalid_email 				= 2001;
+var code_null_invalid_password 				= 2002;
+var code_null_invalid_full_name 			= 2003;
+var code_null_invalid_nick_name 			= 2004;
+var code_null_invalid_gender 				= 2005;
+var code_null_invalid_avatar 				= 2006;
+var code_null_invalid_birthday 				= 2007;
+var code_null_invalid_lat_long 				= 2008;
+var code_null_invalid_address 				= 2009;
+var code_null_invalid_phone 				= 2010;
+var code_null_invalid_profile_description 	= 2011;
 
-var code_duplicate_email 		= 2009;
-var code_duplicate_full_name 	= 2010;
-var code_duplicate_nick_name 	= 2011;
+var code_duplicate_email 					= 2012;
+var code_duplicate_full_name 				= 2013;
+var code_duplicate_nick_name 				= 2014;
 
-var code_wrong_old_password 	= 2012;
+var code_wrong_old_password 				= 2015;
 
-var code_not_exist_email 		= 2013;
-var code_not_exist_profile 		= 2014;
+var code_not_exist_email 					= 2016;
+var code_not_exist_profile 					= 2017;
 
 function errorMessage(code) {
 	var mess;
@@ -49,28 +52,37 @@ function errorMessage(code) {
 		mess = "Sucessfully!";
 		break;
 	case code_null_invalid_email:
-		mess = "Email is blank or not valid.";
+		mess = "Email is blank/null or not valid.";
 		break;
 	case code_null_invalid_password:
-		mess = "Password is blank or not valid.";
+		mess = "Password is blank/null or not valid.";
 		break;
 	case code_null_invalid_full_name:
-		mess = "full_name is blank or not valid.";
+		mess = "full_name is blank/null or not valid.";
+		break;
+	case code_null_invalid_nick_name:
+		mess = "nick_name is blank/null or not valid.";
 		break;
 	case code_null_invalid_gender:
 		mess = "gender is blank or not valid (number is valid).";
 		break;
 	case code_null_invalid_avatar:
-		mess = "avatar is blank or not valid.";
+		mess = "avatar is blank/null or not valid.";
 		break;
 	case code_null_invalid_birthday:
-		mess = "birthday is blank or not valid. (yyyy-mm-dd)";
+		mess = "birthday is blank/null or not valid. (yyyy-mm-dd)";
 		break;
 	case code_null_invalid_lat_long:
-		mess = "latitude & longitude is blank or not valid.";
+		mess = "latitude & longitude is blank/null or not valid.";
 		break;
 	case code_null_invalid_address:
-		mess = "province is blank or not valid.";
+		mess = "province is blank/null or not valid.";
+		break;
+	case code_null_invalid_phone:
+		mess = "phone is blank/null or not valid.";
+		break;
+	case code_null_invalid_profile_description:
+		mess = "profile_description is blank/null or not valid.";
 		break;
 
 	case code_duplicate_email:
@@ -189,6 +201,11 @@ function validateBirthday(birthDay) {
 	} else {
 		return false;
 	}
+}
+
+function validatePhone(phone) {
+	var regex = /^[0-9]{10,11}$/;
+	return regex.test(phone);
 }
 
 function validateCoordinate(latitude,longitude) {
@@ -336,8 +353,8 @@ apiRoutes.post('/register', function(req, res) {
 	pool.getConnection(function(err, connection) {
 		if (err) {
 			res.json({
-				"status": code_db_error,
-				"message": "Error in connection database"
+				status: code_db_error,
+				message: "Error in connection database"
 			});
 			return;
 		}
@@ -346,7 +363,7 @@ apiRoutes.post('/register', function(req, res) {
 		connection.beginTransaction(function(err) {
 			if (err) {
 				res.json({
-						"status": code_db_error,
+						status: code_db_error,
 						"error" 	: err
 					});
 				}
@@ -359,7 +376,7 @@ apiRoutes.post('/register', function(req, res) {
 				// error -> rollback
 				if (error) {
 					res.json({
-						"status": code_db_error,
+						status: code_db_error,
 						"error" 	: error
 					});
 					connection.rollback(function() {
@@ -381,7 +398,7 @@ apiRoutes.post('/register', function(req, res) {
 						if (error) {
 							console.log('//--------------STEP 1: add to table[account]-------------------');
 							res.json({
-								"status": code_db_error,
+								status: code_db_error,
 								"error" 	: error
 							});
 							connection.rollback(function() {
@@ -400,7 +417,7 @@ apiRoutes.post('/register', function(req, res) {
 								if (error) {
 									console.log('//--------------STEP 2: add to table [address]------------------');
 									res.json({
-										"status": code_db_error,
+										status: code_db_error,
 										"error" 	: error
 									});
 									connection.rollback(function() {
@@ -419,7 +436,7 @@ apiRoutes.post('/register', function(req, res) {
 										if (error) {
 											console.log('//--------------STEP 3: add to table [location]-----------------');
 											res.json({
-												"status": code_db_error,
+												status: code_db_error,
 												"error" 	: error
 											});
 											connection.rollback(function() {
@@ -438,7 +455,7 @@ apiRoutes.post('/register', function(req, res) {
 												if (error) {
 													console.log('//--------------STEP 4: add to table [profile]------------------');
 													res.json({
-														"status": code_db_error,
+														status: code_db_error,
 														"error" 	: error
 													});
 													connection.rollback(function() {
@@ -448,8 +465,8 @@ apiRoutes.post('/register', function(req, res) {
 													connection.commit(function(err) {
 														if (err) {
 															res.json({
-																"status": code_db_error,
-																"error" 	: error
+																status: code_db_error,
+																"error" : error
 															});
 															connection.rollback(function() {
 																console.log(error);
@@ -519,8 +536,8 @@ apiRoutes.post('/login', function(req, res) {
 	pool.getConnection(function(err, connection) {
 		if (err) {
 			res.json({
-				"status": code_db_error,
-				"message": "Error in connection database"
+				status: code_db_error,
+				message: "Error in connection database"
 			});
 			return;
 		}
@@ -532,7 +549,10 @@ apiRoutes.post('/login', function(req, res) {
 			connection.release();
 
 			if (error) {
-				res.json(error);
+				res.json({
+					status: code_db_error,
+					"error" : error
+				});
 				return;
 			}
 
@@ -586,8 +606,8 @@ apiRoutes.post('/forgot', function(req, res) {
 	pool.getConnection(function(err, connection) {
 		if (err) {
 			res.json({
-				"status": code_db_error,
-				"message": "Error in connection database"
+				status: code_db_error,
+				message: "Error in connection database"
 			});
 			return;
 		}
@@ -616,7 +636,10 @@ apiRoutes.post('/forgot', function(req, res) {
 				}, function (error, results, fields) {
 					connection.release();
 					if (error) {
-						res.json(error);
+						res.json({
+							status: code_db_error,
+							"error" : error
+						});
 					} else {
 						sendMailResetPass(email_login,randomPassword);
 						res.json({
@@ -691,8 +714,8 @@ apiRoutes.put('/changePass', function(req, res) {
 	pool.getConnection(function(err, connection) {
 		if (err) {
 			res.json({
-				"status": code_db_error,
-				"message": "Error in connection database"
+				status: code_db_error,
+				message: "Error in connection database"
 			});
 			return;
 		}
@@ -718,7 +741,10 @@ apiRoutes.put('/changePass', function(req, res) {
 				}, function (error, results, fields) {
 					connection.release();
 					if (error) {
-						res.json(error);
+						res.json({
+							status: code_db_error,
+							"error" : error
+						});
 					} else {
 						res.json({
 							status: code_success,
@@ -742,14 +768,14 @@ apiRoutes.get('/profile', function(req, res) {
 	var profile_id = req.body.profile_id || req.param('profile_id') || req.headers['profile_id'];
 
 	if (!chkObj(profile_id)) {
-		profile_id = req.decoded['profile_id'];
+		profile_id = req.decoded['account_id'];
 	}
-
+	console.log(profile_id);
 	pool.getConnection(function(err, connection) {
 		if (err) {
 			res.json({
-				"status": code_db_error,
-				"message": "Error in connection database"
+				status: code_db_error,
+				message: "Error in connection database"
 			});
 			return;
 		}
@@ -772,6 +798,153 @@ apiRoutes.get('/profile', function(req, res) {
 });
 
 // ---------------------------------------------------------
+// UPDATE PROFILE (this is authenticated)
+// ---------------------------------------------------------
+
+// http://localhost:1234/api/profile
+apiRoutes.put('/profile', function(req, res) {
+
+	var nick_name 			= req.body.nick_name;
+	var avatar 				= req.body.avatar;
+	var gender 				= req.body.gender;
+	var birthday 			= req.body.birthday;
+	var phone 				= req.body.phone;
+	var profile_description = req.body.profile_description;
+
+	if (
+		!(chkObj(nick_name)) && !(chkObj(avatar)) && !(chkObj(gender))
+		&& !(chkObj(birthday)) && !(chkObj(phone)) && !(chkObj(profile_description))
+		)
+	{
+		console.log('User does not modify profile, no query!');
+		res.json({
+			status: code_success,
+			message: errorMessage(code_success)
+		});
+		return;
+	}
+
+	// STEP 1: Validate nick_name
+	if (chkObj(nick_name) && nick_name == '')
+	{
+		res.json({
+			status: code_null_invalid_nick_name,
+			message: errorMessage(code_null_invalid_nick_name)
+		});
+		return;
+	}
+
+	// STEP 2: Validate avatar
+	if (chkObj(avatar) && avatar == '')
+	{
+		res.json({
+			status: code_null_invalid_avatar,
+			message: errorMessage(code_null_invalid_avatar)
+		});
+		return;
+	}
+
+	// STEP 3: Validate gender
+	if (chkObj(gender) && gender == '')
+	{
+		res.json({
+			status: code_null_invalid_gender,
+			message: errorMessage(code_null_invalid_gender)
+		});
+		return;
+	}
+
+	// STEP 4: Validate birthday
+	if (chkObj(birthday) && (birthday == '' || validateBirthday(birthday) == false))
+	{
+		res.json({
+			status: code_null_invalid_birthday,
+			message: errorMessage(code_null_invalid_birthday)
+		});
+		return;
+	}
+
+	// STEP 5: Validate phone
+	if (chkObj(phone) && (phone == '' || validatePhone(phone) == false))
+	{
+		res.json({
+			status: code_null_invalid_phone,
+			message: errorMessage(code_null_invalid_phone)
+		});
+		return;
+	}
+
+	// STEP 6: Validate profile_description
+	if (chkObj(profile_description) && profile_description == '')
+	{
+		res.json({
+			status: code_null_invalid_profile_description,
+			message: errorMessage(code_null_invalid_profile_description)
+		});
+		return;
+	}
+
+	// get account_id from request.token
+	var account_id = req.decoded['account_id'];
+
+	pool.getConnection(function(err, connection) {
+		if (err) {
+			res.json({
+				status: code_db_error,
+				message: "Error in connection database"
+			});
+			return;
+		}
+
+		//------------------------- UPDATE PROFILE -----------------------------
+		connection.query({
+			sql: 'SELECT * FROM `profile` WHERE `account_id` = ?',
+			timeout: 1000, // 1s
+			values: [account_id]
+		}, function(error, results, fields) {
+			if (error) {
+				res.json({
+					status: code_db_error,
+					"error" : error
+				});
+			} else {
+				connection.query({
+					sql: 'UPDATE `profile` SET '
+					+ '`nick_name`= ?,`avatar`= ?,`gender`= ?,'
+					+ '`birthday`= ?,`phone`= ?,`profile_description`= ?'
+					+ ' WHERE `account_id` = ?',
+					timeout: 1000, // 1s
+					values:
+					[
+						chkObj(nick_name) ? nick_name 						: results[0]['nick_name'],
+						chkObj(avatar) ? avatar 							: results[0]['avatar'],
+						chkObj(gender) ? gender 							: results[0]['gender'],
+						chkObj(birthday) ? birthday 						: results[0]['birthday'],
+						chkObj(phone) ? phone 								: results[0]['phone'],
+						chkObj(profile_description) ? profile_description 	: results[0]['profile_description'],
+					 	account_id
+					]
+				}, function (error, results, fields) {
+					connection.release();
+					if (error) {
+						res.json({
+							status: code_db_error,
+							error : error
+						});
+					} else {
+						res.json({
+							status: code_success,
+							message: errorMessage(code_success)
+						});
+					}
+				});
+			}
+		});
+	});
+});
+
+
+// ---------------------------------------------------------
 // PROFILE (this is authenticated)
 // ---------------------------------------------------------
 
@@ -788,24 +961,28 @@ apiRoutes.get('/allProfile', function(req, res) {
 	pool.getConnection(function(err, connection) {
 		if (err) {
 			res.json({
-				"status": code_db_error,
-				"message": "Error in connection database"
+				status: code_db_error,
+				message: "Error in connection database"
 			});
 			return;
 		}
 		connection.query({
-			sql: 'SELECT * FROM `profile` WHERE `profile_id` = ?',
+			sql: 'SELECT * FROM `profile`',
 			timeout: 1000, // 1s
 			values: [profile_id]
 		}, function(error, results, fields) {
 			connection.release();
 			if (results.length == 0 || results == null) {
 				res.json({
-					status : code_not_exist_profile,
-					message : errorMessage(code_not_exist_profile)
+					success : false,
+					message : "Profile is empty",
+					results : results
 				});
 			} else {
-				res.json(results[0]);
+				res.json({
+					success : true,
+					results : results
+				});
 			}
 		});
 	});
