@@ -945,18 +945,11 @@ apiRoutes.put('/profile', function(req, res) {
 
 
 // ---------------------------------------------------------
-// PROFILE (this is authenticated)
+// ALL PROFILE (this is authenticated)
 // ---------------------------------------------------------
 
 // http://localhost:1234/api/allProfile
 apiRoutes.get('/allProfile', function(req, res) {
-
-	// check header or url parameters or post parameters for token
-	var profile_id = req.body.profile_id || req.param('profile_id') || req.headers['profile_id'];
-
-	if (chkObj(profile_id)) {
-		var profile_id = req.decoded['profile_id'];
-	}
 
 	pool.getConnection(function(err, connection) {
 		if (err) {
