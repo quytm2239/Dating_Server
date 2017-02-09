@@ -28,18 +28,19 @@ var code_null_invalid_email 	= 2001;
 var code_null_invalid_password 	= 2002;
 var code_null_invalid_full_name = 2003;
 var code_null_invalid_gender 	= 2004;
-var code_null_invalid_birthday 	= 2005;
-var code_null_invalid_lat_long 	= 2006;
-var code_null_invalid_address 	= 2007;
+var code_null_invalid_avatar 	= 2005;
+var code_null_invalid_birthday 	= 2006;
+var code_null_invalid_lat_long 	= 2007;
+var code_null_invalid_address 	= 2008;
 
-var code_duplicate_email 		= 2008;
-var code_duplicate_full_name 	= 2009;
-var code_duplicate_nick_name 	= 2010;
+var code_duplicate_email 		= 2009;
+var code_duplicate_full_name 	= 2010;
+var code_duplicate_nick_name 	= 2011;
 
-var code_wrong_old_password 	= 2011;
+var code_wrong_old_password 	= 2012;
 
-var code_not_exist_email 		= 2012;
-var code_not_exist_profile 		= 2013;
+var code_not_exist_email 		= 2013;
+var code_not_exist_profile 		= 2014;
 
 function errorMessage(code) {
 	var mess;
@@ -59,6 +60,9 @@ function errorMessage(code) {
 	case code_null_invalid_gender:
 		mess = "gender is blank or not valid (number is valid).";
 		break;
+	case code_null_invalid_avatar:
+		mess = "avatar is blank or not valid.";
+		break;
 	case code_null_invalid_birthday:
 		mess = "birthday is blank or not valid. (yyyy-mm-dd)";
 		break;
@@ -67,8 +71,8 @@ function errorMessage(code) {
 		break;
 	case code_null_invalid_address:
 		mess = "province is blank or not valid.";
-		break;		
-		
+		break;
+
 	case code_duplicate_email:
 		mess = "email already exist";
 		break;
@@ -78,11 +82,11 @@ function errorMessage(code) {
 	case code_duplicate_nick_name:
 		mess = "nick_name already exist";
 		break;
-		
+
 	case code_wrong_old_password:
 		mess = "old_password is wrong";
 		break;
-		
+
 	case code_not_exist_email:
 		mess = "email does not exist";
 		break;
@@ -154,34 +158,34 @@ function validateEmail(email) {
 
 function validateBirthday(birthDay) {
 	var regex = /^[0-9]{4}\-[0-9]{2}\-[0-9]{2}$/;
-	
+
 	if (regex.test(birthDay)) {
 		var res = birthDay.split("-");
 		var year = res[0];
 		var month = res[1];
 		var day = res[2];
-		
+
 		if (month < 1 || month > 12 || day <= 0) {
 			return false;
 		}
-		
+
 		switch (month) {
-			case '01': case '03': case '05': case '07': 
+			case '01': case '03': case '05': case '07':
 			case '08': case '10': case '12':
 				if (day > 31) return false;
 			break;
-			
+
 			case '02':
-				if (year%4 == 0 && day > 29)  { return false; } 
+				if (year%4 == 0 && day > 29)  { return false; }
 				if (year%4 != 0 && day > 28)  { return false; }
 			break;
-			
+
 			case '04': case '06': case '09': case '11':
 				if (day > 30) return false;
 			break;
 		}
 		return true;
-		
+
 	} else {
 		return false;
 	}
@@ -189,8 +193,8 @@ function validateBirthday(birthDay) {
 
 function validateCoordinate(latitude,longitude) {
 	if (
-		(isNaN(latitude) == false || isNaN(longitude) == false) 
-		&& 
+		(isNaN(latitude) == false || isNaN(longitude) == false)
+		&&
 		(latitude <= 90.0 && latitude >= -90.0) || (longitude >= 0.0 && longitude <= 360.0)
 		) {
 		return true;
@@ -212,16 +216,16 @@ function sendMailResetPass(emailLogin, resetPass) {
             pass: 'thucgu239' // Your password
         }
     });
-	
+
 	var text = 'Your new pass of ' + emailLogin + ' is: ' + resetPass;
-	
+
 	var mailOptions = {
 		from: 'noreply_dating@gmail.com', // sender address
 		to: emailLogin, // list of receivers
 		subject: 'Dating Reset password', // Subject line
 		text: text
 	};
-	
+
 	transporter.sendMail(mailOptions, function(error, info){
 		if(error){
 			console.log(error);
@@ -241,18 +245,19 @@ var apiRoutes = express.Router();
 
 // http://localhost:1234/api/register
 apiRoutes.post('/register', function(req, res) {
-	
+
 	var email_login 	= req.body.email_login;
 	var password 		= req.body.password;
 	var full_name 		= req.body.full_name;
 	var gender 			= req.body.gender;
+	var avatar 			= req.body.avatar;
 	var birthday 		= req.body.birthday;
 	var province 		= req.body.province;
 	var latitude 		= req.body.latitude;
 	var longitude 		= req.body.longitude;
-	
+
 	// Validate email_login
-	if (!(chkObj(email_login)) || !(validateEmail(email_login))) 
+	if (!(chkObj(email_login)) || !(validateEmail(email_login)))
 	{
 		res.json({
 			status: code_null_invalid_email,
@@ -260,7 +265,7 @@ apiRoutes.post('/register', function(req, res) {
 		});
 		return;
 	}
-	
+
 	// Validate password
 	if (!(chkObj(password))) {
 		res.json({
@@ -269,7 +274,7 @@ apiRoutes.post('/register', function(req, res) {
 		});
 		return;
 	}
-	
+
 	// Validate full_name
 	if (!(chkObj(full_name))) {
 		res.json({
@@ -278,7 +283,17 @@ apiRoutes.post('/register', function(req, res) {
 		});
 		return;
 	}
-	
+
+	// Validate avatar
+	if (!(chkObj(avatar)))
+	{
+		res.json({
+			status: code_null_invalid_avatar,
+			message: errorMessage(code_null_invalid_avatar)
+		});
+		return;
+	}
+
 	// Validate gender
 	if (!(chkObj(gender)) || isNaN(gender) || gender < 0 || gender > 5) {
 		res.json({
@@ -287,9 +302,9 @@ apiRoutes.post('/register', function(req, res) {
 		});
 		return;
 	}
-	
+
 	// Validate birthday
-	if (!(chkObj(birthday)) || !(validateBirthday(birthday))) 
+	if (!(chkObj(birthday)) || !(validateBirthday(birthday)))
 	{
 		res.json({
 			status: code_null_invalid_birthday,
@@ -297,9 +312,9 @@ apiRoutes.post('/register', function(req, res) {
 		});
 		return;
 	}
-	
+
 	// Validate address
-	if (!(chkObj(province))) 
+	if (!(chkObj(province)))
 	{
 		res.json({
 			status: code_null_invalid_address,
@@ -307,9 +322,9 @@ apiRoutes.post('/register', function(req, res) {
 		});
 		return;
 	}
-	
+
 	// Validate coordinate
-	if (!(chkObj(latitude)) || !(chkObj(longitude)) || !(validateCoordinate(latitude,longitude))) 
+	if (!(chkObj(latitude)) || !(chkObj(longitude)) || !(validateCoordinate(latitude,longitude)))
 	{
 		res.json({
 			status: code_null_invalid_lat_long,
@@ -317,7 +332,7 @@ apiRoutes.post('/register', function(req, res) {
 		});
 		return;
 	}
-	
+
 	pool.getConnection(function(err, connection) {
 		if (err) {
 			res.json({
@@ -326,23 +341,23 @@ apiRoutes.post('/register', function(req, res) {
 			});
 			return;
 		}
-		
+
 		/* Begin transaction */
-		connection.beginTransaction(function(err) {	
-			if (err) { 					
+		connection.beginTransaction(function(err) {
+			if (err) {
 				res.json({
 						"status": code_db_error,
 						"error" 	: err
-					}); 
+					});
 				}
-			
+
 			connection.query({
 				sql: 'SELECT * FROM `account` WHERE `email_login` = ?',
 				timeout: 5000, // 5s
 				values: [email_login]
 			}, function(error, results, fields) {
 				// error -> rollback
-				if (error) { 
+				if (error) {
 					res.json({
 						"status": code_db_error,
 						"error" 	: error
@@ -350,19 +365,19 @@ apiRoutes.post('/register', function(req, res) {
 					connection.rollback(function() {
 						console.log(error);
 					});
-				}  			
-			
-				if (results == null || results.length == 0) 
+				}
+
+				if (results == null || results.length == 0)
 				{
-					//--------------STEP 1: add to table[account]------------------- 
+					//--------------STEP 1: add to table[account]-------------------
 					var insertedAccountId;
 					connection.query({
-						sql: 'INSERT INTO `account`(`email_login`, `full_name`, `password`, `login_status`)'  
+						sql: 'INSERT INTO `account`(`email_login`, `full_name`, `password`, `login_status`)'
 							+ 'VALUES (?,?,?,?)',
 						timeout: 1000, // 1s
 						values: [email_login, full_name, hashPass(password), 0]
 					}, function (error, results, fields) {
-						
+
 						if (error) {
 							console.log('//--------------STEP 1: add to table[account]-------------------');
 							res.json({
@@ -392,7 +407,7 @@ apiRoutes.post('/register', function(req, res) {
 										console.log(error);
 									});
 								} else {
-									
+
 					//--------------STEP 3: add to table [location]-----------------
 									connection.query({
 										sql: 'INSERT INTO `location`(`latitude`, `longitude`, `account_id`)'
@@ -406,32 +421,32 @@ apiRoutes.post('/register', function(req, res) {
 											res.json({
 												"status": code_db_error,
 												"error" 	: error
-											});												
+											});
 											connection.rollback(function() {
 												console.log(error);
 											});
 										} else {
-											
+
 					//--------------STEP 4: add to table [profile]------------------
 											connection.query({
-												sql: 'INSERT INTO `profile`(`gender`, `account_id`, `birthday`)'
-												+ ' VALUES (?,?,?)',
+												sql: 'INSERT INTO `profile`(`avatar`, `gender`, `account_id`, `birthday`)'
+												+ ' VALUES (?,?,?,?)',
 												timeout: 1000, // 1s
-												values: [gender, insertedAccountId, birthday]
+												values: [avatar, gender, insertedAccountId, birthday]
 											}, function (error, results, fields) {
-												
+
 												if (error) {
 													console.log('//--------------STEP 4: add to table [profile]------------------');
 													res.json({
 														"status": code_db_error,
 														"error" 	: error
-													});	
+													});
 													connection.rollback(function() {
 														console.log(error);
 													});
 												} else {
 													connection.commit(function(err) {
-														if (err) { 
+														if (err) {
 															res.json({
 																"status": code_db_error,
 																"error" 	: error
@@ -447,17 +462,17 @@ apiRoutes.post('/register', function(req, res) {
 														});
 														connection.release();
 					//--------------REGISTER SUCESSFULLY----------------------------
-													});														
+													});
 												}
-											});											
+											});
 										}
-									});	
+									});
 								}
-							});						
+							});
 						}
 					});
-				} 
-				else 
+				}
+				else
 				{
 					connection.release();
 					res.json({
@@ -478,12 +493,12 @@ apiRoutes.post('/register', function(req, res) {
 // http://localhost:1234/api/login
 apiRoutes.post('/login', function(req, res) {
 	console.log('/login: ' + req.body.email_login);
-	
+
 	var email_login = req.body.email_login;
 	var password 	= req.body.password;
-	
+
 	// Validate email_login
-	if (!(chkObj(email_login)) || !(validateEmail(email_login))) 
+	if (!(chkObj(email_login)) || !(validateEmail(email_login)))
 	{
 		res.json({
 			status: code_null_invalid_email,
@@ -491,7 +506,7 @@ apiRoutes.post('/login', function(req, res) {
 		});
 		return;
 	}
-	
+
 	// Validate password
 	if (!(chkObj(password))) {
 		res.json({
@@ -500,7 +515,7 @@ apiRoutes.post('/login', function(req, res) {
 		});
 		return;
 	}
-	
+
 	pool.getConnection(function(err, connection) {
 		if (err) {
 			res.json({
@@ -515,12 +530,12 @@ apiRoutes.post('/login', function(req, res) {
 			values: [email_login]
 		}, function(error, results, fields) {
 			connection.release();
-			
+
 			if (error) {
 				res.json(error);
 				return;
 			}
-			
+
 			if (results == null || results.length == 0) {
 				res.json({
 					status: code_not_exist_email,
@@ -540,6 +555,7 @@ apiRoutes.post('/login', function(req, res) {
 					res.json({
 						status: code_success,
 						message: errorMessage(code_success),
+						login_account: results[0],
 						token: token
 					});
 				}
@@ -554,11 +570,11 @@ apiRoutes.post('/login', function(req, res) {
 
 // http://localhost:1234/api/forgot
 apiRoutes.post('/forgot', function(req, res) {
-	
+
 	var email_login = req.body.email_login;
-	
+
 	// Validate email_login
-	if (!(chkObj(email_login)) || !(validateEmail(email_login))) 
+	if (!(chkObj(email_login)) || !(validateEmail(email_login)))
 	{
 		res.json({
 			status: code_null_invalid_email,
@@ -566,7 +582,7 @@ apiRoutes.post('/forgot', function(req, res) {
 		});
 		return;
 	}
-		
+
 	pool.getConnection(function(err, connection) {
 		if (err) {
 			res.json({
@@ -581,7 +597,7 @@ apiRoutes.post('/forgot', function(req, res) {
 			timeout: 1000, // 1s
 			values: [req.body.email_login]
 		}, function(error, results, fields) {
-			
+
 			if (results == null || results.length == 0) { // email_login not found
 				connection.release();
 				res.json({
@@ -590,10 +606,10 @@ apiRoutes.post('/forgot', function(req, res) {
 				});
 			} else { // found -> update new random password
 				var randomPassword = Math.random().toString(36).slice(-8);
-				
+
 				connection.query({
 					sql: 'UPDATE `account` '
-					+ 'SET `password`= ?' 
+					+ 'SET `password`= ?'
 					+ ' WHERE `account_id` = ?',
 					timeout: 1000, // 1s
 					values: [hashPass(randomPassword), results[0]['account_id']]
@@ -657,10 +673,10 @@ apiRoutes.use(function(req, res, next) {
 
 // http://localhost:1234/api/changePass
 apiRoutes.put('/changePass', function(req, res) {
-	
+
 	var old_password = req.body.old_password;
 	var new_password = req.body.new_password;
-	
+
 	if (!(chkObj(old_password)) || !(chkObj(new_password))) {
 		res.json({
 			status: code_null_invalid_password,
@@ -668,10 +684,10 @@ apiRoutes.put('/changePass', function(req, res) {
 		});
 		return;
 	}
-	
+
 	// get account_id from request.token
 	var account_id = req.decoded['account_id'];
-	
+
 	pool.getConnection(function(err, connection) {
 		if (err) {
 			res.json({
@@ -695,7 +711,7 @@ apiRoutes.put('/changePass', function(req, res) {
 			} else { // Old_password matched -> update new pass
 				connection.query({
 					sql: 'UPDATE `account` '
-					+ 'SET `password`= ?' 
+					+ 'SET `password`= ?'
 					+ ' WHERE `account_id` = ?',
 					timeout: 1000, // 1s
 					values: [hashPass(new_password), account_id]
@@ -721,9 +737,14 @@ apiRoutes.put('/changePass', function(req, res) {
 
 // http://localhost:1234/api/profile
 apiRoutes.get('/profile', function(req, res) {
-	var account_id = req.decoded['account_id'];
-	console.log('/profile -> acc_id: ' + account_id);
-	
+
+	// check header or url parameters or post parameters for token
+	var profile_id = req.body.profile_id || req.param('profile_id') || req.headers['profile_id'];
+
+	if (chkObj(profile_id)) {
+		var profile_id = req.decoded['profile_id'];
+	}
+
 	pool.getConnection(function(err, connection) {
 		if (err) {
 			res.json({
@@ -733,9 +754,9 @@ apiRoutes.get('/profile', function(req, res) {
 			return;
 		}
 		connection.query({
-			sql: 'SELECT * FROM `profile` WHERE `account_id` = ?',
+			sql: 'SELECT * FROM `profile` WHERE `profile_id` = ?',
 			timeout: 1000, // 1s
-			values: [account_id]
+			values: [profile_id]
 		}, function(error, results, fields) {
 			connection.release();
 			if (results.length == 0 || results == null) {
