@@ -27,7 +27,7 @@ var code_success = 200;
 var code_null_invalid_email 				= 2001;
 var code_null_invalid_password 				= 2002;
 var code_null_invalid_full_name 			= 2003;
-var code_null_invalid_nick_name 			= 2004;
+var code_null_invalid_status 				= 2004;
 var code_null_invalid_gender 				= 2005;
 var code_null_invalid_avatar 				= 2006;
 var code_null_invalid_birthday 				= 2007;
@@ -38,12 +38,12 @@ var code_null_invalid_profile_description 	= 2011;
 
 var code_duplicate_email 					= 2012;
 var code_duplicate_full_name 				= 2013;
-var code_duplicate_nick_name 				= 2014;
 
-var code_wrong_old_password 				= 2015;
+var code_wrong_old_password 				= 2014;
 
-var code_not_exist_email 					= 2016;
-var code_not_exist_profile 					= 2017;
+var code_not_exist_email 					= 2015;
+var code_not_exist_profile 					= 2016;
+var code_not_exist_status 					= 2017;
 
 function errorMessage(code) {
 	var mess;
@@ -60,8 +60,8 @@ function errorMessage(code) {
 	case code_null_invalid_full_name:
 		mess = "full_name is blank/null or not valid.";
 		break;
-	case code_null_invalid_nick_name:
-		mess = "nick_name is blank/null or not valid.";
+	case code_null_invalid_status:
+		mess = "status is blank/null or not valid.";
 		break;
 	case code_null_invalid_gender:
 		mess = "gender is blank or not valid (number is valid).";
@@ -91,9 +91,6 @@ function errorMessage(code) {
 	case code_duplicate_full_name:
 		mess = "full_name already exist";
 		break;
-	case code_duplicate_nick_name:
-		mess = "nick_name already exist";
-		break;
 
 	case code_wrong_old_password:
 		mess = "old_password is wrong";
@@ -104,6 +101,9 @@ function errorMessage(code) {
 		break;
 	case code_not_exist_profile:
 		mess = "profile does not exist";
+		break;
+	case code_not_exist_status:
+		mess = "status does not exist";
 		break;
 	}
 	return mess;
@@ -758,19 +758,12 @@ apiRoutes.put('/changePass', function(req, res) {
 });
 
 // ---------------------------------------------------------
-// PROFILE (this is authenticated)
+// ALL PROFILE (this is authenticated)
 // ---------------------------------------------------------
 
-// http://localhost:1234/api/profile
-apiRoutes.get('/profile', function(req, res) {
+// http://localhost:1234/api/allProfile
+apiRoutes.get('/allProfile', function(req, res) {
 
-	// check header or url parameters or post parameters for token
-	var profile_id = req.body.profile_id || req.param('profile_id') || req.headers['profile_id'];
-
-	if (!chkObj(profile_id)) {
-		profile_id = req.decoded['account_id'];
-	}
-	console.log(profile_id);
 	pool.getConnection(function(err, connection) {
 		if (err) {
 			res.json({
@@ -780,18 +773,77 @@ apiRoutes.get('/profile', function(req, res) {
 			return;
 		}
 		connection.query({
-			sql: 'SELECT * FROM `profile` WHERE `profile_id` = ?',
+			sql: 'SELECT * FROM `profile`',
 			timeout: 1000, // 1s
-			values: [profile_id]
+			values: []
 		}, function(error, results, fields) {
 			connection.release();
+			if (results.length == 0 || results == null) {
+				res.json({
+					success : false,
+					message : "Profile is empty",
+					results : results
+				});
+			} else {
+				res.json({
+					success : true,
+					results : results
+				});
+			}
+		});
+	});
+});
+
+// ---------------------------------------------------------
+// PROFILE (this is authenticated)
+// ---------------------------------------------------------
+
+// http://localhost:1234/api/profile
+apiRoutes.get('/profile', function(req, res) {
+
+	// check header or url parameters or post parameters for token
+	var profile_id = req.body.profile_id || req.param('profile_id') || req.headers['profile_id'];
+	var account_id = req.decoded['account_id'];
+	var sqlQuery = '';
+
+	if (chkObj(profile_id)) { // contain profile_id in request
+		sqlQuery = 'SELECT * FROM `profile` WHERE `profile_id` = ?';
+	} else {
+		sqlQuery = 'SELECT * FROM `profile` WHERE `account_id` = ?';
+	}
+
+	pool.getConnection(function(err, connection) {
+		if (err) {
+			res.json({
+				status: code_db_error,
+				message: "Error in connection database"
+			});
+			return;
+		}
+		connection.query({
+			sql: sqlQuery,
+			timeout: 1000, // 1s
+			values: [chkObj(profile_id) ? profile_id : account_id]
+		}, function(error, results, fields) {
+			var foundProfile = results[0];
 			if (results.length == 0 || results == null) {
 				res.json({
 					status : code_not_exist_profile,
 					message : errorMessage(code_not_exist_profile)
 				});
 			} else {
-				res.json(results[0]);
+				connection.query({
+					sql: 'SELECT * FROM `status` WHERE `account_id` = ?',
+					timeout: 1000, // 1s
+					values: [foundProfile['account_id']]
+				}, function(error, results, fields) {
+					connection.release();
+					var foundStatus = results[0];
+					res.json({
+						status: chkObj(foundStatus) ? foundStatus : {},
+						profile: foundProfile
+					});
+				});
 			}
 		});
 	});
@@ -804,7 +856,6 @@ apiRoutes.get('/profile', function(req, res) {
 // http://localhost:1234/api/profile
 apiRoutes.put('/profile', function(req, res) {
 
-	var nick_name 			= req.body.nick_name;
 	var avatar 				= req.body.avatar;
 	var gender 				= req.body.gender;
 	var birthday 			= req.body.birthday;
@@ -812,8 +863,8 @@ apiRoutes.put('/profile', function(req, res) {
 	var profile_description = req.body.profile_description;
 
 	if (
-		!(chkObj(nick_name)) && !(chkObj(avatar)) && !(chkObj(gender))
-		&& !(chkObj(birthday)) && !(chkObj(phone)) && !(chkObj(profile_description))
+		!(chkObj(avatar)) && !(chkObj(gender)) && !(chkObj(birthday))
+		&& !(chkObj(phone)) && !(chkObj(profile_description))
 		)
 	{
 		console.log('User does not modify profile, no query!');
@@ -824,17 +875,7 @@ apiRoutes.put('/profile', function(req, res) {
 		return;
 	}
 
-	// STEP 1: Validate nick_name
-	if (chkObj(nick_name) && nick_name == '')
-	{
-		res.json({
-			status: code_null_invalid_nick_name,
-			message: errorMessage(code_null_invalid_nick_name)
-		});
-		return;
-	}
-
-	// STEP 2: Validate avatar
+	// STEP 1: Validate avatar
 	if (chkObj(avatar) && avatar == '')
 	{
 		res.json({
@@ -844,7 +885,7 @@ apiRoutes.put('/profile', function(req, res) {
 		return;
 	}
 
-	// STEP 3: Validate gender
+	// STEP 2: Validate gender
 	if (chkObj(gender) && gender == '')
 	{
 		res.json({
@@ -854,7 +895,7 @@ apiRoutes.put('/profile', function(req, res) {
 		return;
 	}
 
-	// STEP 4: Validate birthday
+	// STEP 2: Validate birthday
 	if (chkObj(birthday) && (birthday == '' || validateBirthday(birthday) == false))
 	{
 		res.json({
@@ -864,7 +905,7 @@ apiRoutes.put('/profile', function(req, res) {
 		return;
 	}
 
-	// STEP 5: Validate phone
+	// STEP 3: Validate phone
 	if (chkObj(phone) && (phone == '' || validatePhone(phone) == false))
 	{
 		res.json({
@@ -874,7 +915,7 @@ apiRoutes.put('/profile', function(req, res) {
 		return;
 	}
 
-	// STEP 6: Validate profile_description
+	// STEP 4: Validate profile_description
 	if (chkObj(profile_description) && profile_description == '')
 	{
 		res.json({
@@ -910,13 +951,12 @@ apiRoutes.put('/profile', function(req, res) {
 			} else {
 				connection.query({
 					sql: 'UPDATE `profile` SET '
-					+ '`nick_name`= ?,`avatar`= ?,`gender`= ?,'
-					+ '`birthday`= ?,`phone`= ?,`profile_description`= ?'
+					+ '`avatar`= ?,`gender`= ?,`birthday`= ?,'
+					+ '`phone`= ?,`profile_description`= ?'
 					+ ' WHERE `account_id` = ?',
 					timeout: 1000, // 1s
 					values:
 					[
-						chkObj(nick_name) ? nick_name 						: results[0]['nick_name'],
 						chkObj(avatar) ? avatar 							: results[0]['avatar'],
 						chkObj(gender) ? gender 							: results[0]['gender'],
 						chkObj(birthday) ? birthday 						: results[0]['birthday'],
@@ -943,13 +983,81 @@ apiRoutes.put('/profile', function(req, res) {
 	});
 });
 
+// ---------------------------------------------------------
+// STATUS (this is authenticated)
+// ---------------------------------------------------------
+
+// http://localhost:1234/api/status
+apiRoutes.get('/status', function(req, res) {
+	pool.getConnection(function(err, connection) {
+
+		// check header or url parameters or post parameters for token
+		var status_id = req.body.status_id || req.param('status_id') || req.headers['status_id'];
+		var account_id = req.decoded['account_id'];
+		var sqlQuery = '';
+
+		if (chkObj(status_id)) { // contain status_id in request
+			sqlQuery = 'SELECT * FROM `status` WHERE `status_id` = ' + status_id;
+		} else {
+			sqlQuery = 'SELECT * FROM `status` WHERE `account_id` = ' + account_id;
+		}
+
+		if (err) {
+			res.json({
+				status: code_db_error,
+				message: "Error in connection database"
+			});
+			return;
+		}
+		connection.query({
+			sql: sqlQuery,
+			timeout: 1000, // 1s
+			values: []
+		}, function(error, results, fields) {
+			connection.release();
+			if (results.length == 0 || results == null) {
+				res.json({
+					status : code_not_exist_status,
+					message : errorMessage(code_not_exist_status)
+				});
+			} else {
+				res.json(results[0]);
+			}
+		});
+	});
+});
 
 // ---------------------------------------------------------
-// ALL PROFILE (this is authenticated)
+// UPDATE STATUS (this is authenticated)
 // ---------------------------------------------------------
 
-// http://localhost:1234/api/allProfile
-apiRoutes.get('/allProfile', function(req, res) {
+// http://localhost:1234/api/status
+apiRoutes.put('/status', function(req, res) {
+
+	var status = req.body.status;
+
+	if (!(chkObj(status)))
+	{
+		console.log('User does not modify [status], no query!');
+		res.json({
+			status: code_success,
+			message: errorMessage(code_success)
+		});
+		return;
+	}
+
+	// Validate status
+	if (chkObj(status) && status == '')
+	{
+		res.json({
+			status: code_null_invalid_status,
+			message: errorMessage(code_null_invalid_status)
+		});
+		return;
+	}
+
+	// get account_id from request.token
+	var account_id = req.decoded['account_id'];
 
 	pool.getConnection(function(err, connection) {
 		if (err) {
@@ -959,24 +1067,48 @@ apiRoutes.get('/allProfile', function(req, res) {
 			});
 			return;
 		}
+
+		//------------------------- UPDATE STATUS ------------------------------
 		connection.query({
-			sql: 'SELECT * FROM `profile`',
+			sql: 'SELECT * FROM `status`'
+			+ ' WHERE `account_id` = ?',
 			timeout: 1000, // 1s
-			values: []
-		}, function(error, results, fields) {
-			connection.release();
-			if (results.length == 0 || results == null) {
+			values:[account_id]
+		}, function (error, results, fields) {
+			console.log('results: ' + results[0]);
+			if (error) {
 				res.json({
-					success : false,
-					message : "Profile is empty",
-					results : results
+					status: code_db_error,
+					"error" : error
 				});
-			} else {
-				res.json({
-					success : true,
-					results : results
-				});
+				connection.release();
+				return;
 			}
+
+			var sqlQuery = '';
+			if (results == null || results.length == 0) {
+				sqlQuery = 'INSERT INTO `status`(`content`,`account_id`) VALUES (?,?)'
+			} else {
+				sqlQuery = 'UPDATE `status` SET `content`= ? WHERE `account_id` = ?';
+			}
+			connection.query({
+				sql: sqlQuery,
+				timeout: 1000, // 1s
+				values:[status,account_id]
+			}, function (error, results, fields) {
+				connection.release();
+				if (error) {
+					res.json({
+						status: code_db_error,
+						error : error
+					});
+				} else {
+					res.json({
+						status: code_success,
+						message: errorMessage(code_success)
+					});
+				}
+			});
 		});
 	});
 });
