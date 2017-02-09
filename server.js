@@ -66,7 +66,7 @@ function errorMessage(code) {
 		mess = "latitude & longitude is blank or not valid.";
 		break;
 	case code_null_invalid_address:
-		mess = "country/city/district is blank or not valid.";
+		mess = "province is blank or not valid.";
 		break;		
 		
 	case code_duplicate_email:
@@ -204,11 +204,6 @@ function getAge(birthDayStr) {
 	return Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25));
 }
 
-function getDetailAddress() {
-	//http://maps.googleapis.com/maps/api/geocode/json?latlng=21.016796,105.781982&sensor=false
-	
-}
-
 function sendMailResetPass(emailLogin, resetPass) {
     var transporter = nodemailer.createTransport({
         service: 'Gmail',
@@ -252,10 +247,7 @@ apiRoutes.post('/register', function(req, res) {
 	var full_name 		= req.body.full_name;
 	var gender 			= req.body.gender;
 	var birthday 		= req.body.birthday;
-	var district 		= req.body.district;
-	var city_province 	= req.body.city_province;
-	var state 			= req.body.state === undefined || req.body.state === null ? '' : req.body.state; // not required
-	var country 		= req.body.country;
+	var province 		= req.body.province;
 	var latitude 		= req.body.latitude;
 	var longitude 		= req.body.longitude;
 	
@@ -307,7 +299,7 @@ apiRoutes.post('/register', function(req, res) {
 	}
 	
 	// Validate address
-	if (!(chkObj(district)) || !(chkObj(city_province)) || !(chkObj(country))) 
+	if (!(chkObj(province))) 
 	{
 		res.json({
 			status: code_null_invalid_address,
@@ -317,8 +309,6 @@ apiRoutes.post('/register', function(req, res) {
 	}
 	
 	// Validate coordinate
-	console.log(latitude);
-	console.log(longitude);
 	if (!(chkObj(latitude)) || !(chkObj(longitude)) || !(validateCoordinate(latitude,longitude))) 
 	{
 		res.json({
@@ -386,10 +376,10 @@ apiRoutes.post('/register', function(req, res) {
 							insertedAccountId = results.insertId; // store account.account_id is just inserted
 					//--------------STEP 2: add to table [address]------------------
 							connection.query({
-								sql: 'INSERT INTO `address`(`district`, `city_province`, `state`, `country`, `account_id`)'
-								+ ' VALUES (?,?,?,?,?)',
+								sql: 'INSERT INTO `address`(`province`, `account_id`)'
+								+ ' VALUES (?,?)',
 								timeout: 1000, // 1s
-								values: [district, city_province, state, country, insertedAccountId]
+								values: [province, insertedAccountId]
 							}, function (error, results, fields) {
 
 								if (error) {
@@ -639,7 +629,7 @@ apiRoutes.use(function(req, res, next) {
         jwt.verify(token, app.get('superSecret'), function(err, decoded) {
             if (err) {
                 return res.json({
-                    error_code: 4031,
+                    status: 4031,
                     message: 'Failed to authenticate token.'
                 });
             } else {
@@ -651,24 +641,15 @@ apiRoutes.use(function(req, res, next) {
 
     } else {
         return res.status(403).send({
-            error_code: 403,
+            status: 403,
             message: 'No token provided.'
         });
     }
 });
 
-// ---------------------------------------------------------
-// authenticated routes
-// ---------------------------------------------------------
-apiRoutes.get('/', function(req, res) {
-    res.json({
-        message: 'Welcome to the coolest API on earth!'
-    });
-});
-
-apiRoutes.get('/check', function(req, res) {
-    res.json(req.decoded);
-});
+//==============================================================================
+//============================Authenticated routes==============================
+//==============================================================================
 
 // ---------------------------------------------------------
 // CHANGE PASSWORD (this is authenticated)
@@ -679,8 +660,6 @@ apiRoutes.put('/changePass', function(req, res) {
 	
 	var old_password = req.body.old_password;
 	var new_password = req.body.new_password;
-	
-	
 	
 	if (!(chkObj(old_password)) || !(chkObj(new_password))) {
 		res.json({
@@ -736,7 +715,10 @@ apiRoutes.put('/changePass', function(req, res) {
 	});
 });
 
-// PROFILE
+// ---------------------------------------------------------
+// PROFILE (this is authenticated)
+// ---------------------------------------------------------
+
 // http://localhost:1234/api/profile
 apiRoutes.get('/profile', function(req, res) {
 	var account_id = req.decoded['account_id'];
@@ -756,7 +738,6 @@ apiRoutes.get('/profile', function(req, res) {
 			values: [account_id]
 		}, function(error, results, fields) {
 			connection.release();
-			console.log(results);
 			if (results.length == 0 || results == null) {
 				res.json({
 					status : code_not_exist_profile,
