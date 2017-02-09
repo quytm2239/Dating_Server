@@ -962,7 +962,7 @@ apiRoutes.get('/allProfile', function(req, res) {
 		connection.query({
 			sql: 'SELECT * FROM `profile`',
 			timeout: 1000, // 1s
-			values: [profile_id]
+			values: []
 		}, function(error, results, fields) {
 			connection.release();
 			if (results.length == 0 || results == null) {
