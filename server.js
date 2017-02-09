@@ -145,8 +145,23 @@ var pool = mysql.createPool({
 // Utilities function
 // ---------------------------------------------------------
 
-//hashPass('123456');
-//hashPass: sha1$214da8ad$1$37aed6a35d09186fb9b2ee75bd6f8559c565a24e
+function getDistance(lat1,lon1,lat2,lon2) {
+  var R = 6371; // Radius of the earth in km (mean radius)
+  var dLat = deg2rad(lat2-lat1);  // deg2rad below
+  var dLon = deg2rad(lon2-lon1);
+  var a =
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+    Math.sin(dLon/2) * Math.sin(dLon/2)
+    ;
+  var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  var d = R * c; // Distance in km
+  return d;
+}
+
+function deg2rad(deg) {
+  return deg * (Math.PI/180)
+}
 
 function chkObj(obj) {
 	if ((obj === undefined || obj === null) == false) {
@@ -782,7 +797,7 @@ apiRoutes.get('/allProfile', function(req, res) {
 				res.json({
 					success : false,
 					message : "Profile is empty",
-					results : results
+					results : []
 				});
 			} else {
 				res.json({
@@ -795,7 +810,7 @@ apiRoutes.get('/allProfile', function(req, res) {
 });
 
 // ---------------------------------------------------------
-// PROFILE (this is authenticated)
+// GET PROFILE (this is authenticated)
 // ---------------------------------------------------------
 
 // http://localhost:1234/api/profile
@@ -825,24 +840,16 @@ apiRoutes.get('/profile', function(req, res) {
 			timeout: 1000, // 1s
 			values: [chkObj(profile_id) ? profile_id : account_id]
 		}, function(error, results, fields) {
-			var foundProfile = results[0];
-			if (results.length == 0 || results == null) {
+			connection.release();
+			if (results.length == 0 || results == null) { // not found record
 				res.json({
 					status : code_not_exist_profile,
-					message : errorMessage(code_not_exist_profile)
+					profile : errorMessage(code_not_exist_profile)
 				});
-			} else {
-				connection.query({
-					sql: 'SELECT * FROM `status` WHERE `account_id` = ?',
-					timeout: 1000, // 1s
-					values: [foundProfile['account_id']]
-				}, function(error, results, fields) {
-					connection.release();
-					var foundStatus = results[0];
-					res.json({
-						status: chkObj(foundStatus) ? foundStatus : {},
-						profile: foundProfile
-					});
+			} else { // found record
+				res.json({
+					status: code_success,
+					results: results[0]
 				});
 			}
 		});
@@ -856,6 +863,7 @@ apiRoutes.get('/profile', function(req, res) {
 // http://localhost:1234/api/profile
 apiRoutes.put('/profile', function(req, res) {
 
+	var status 				= req.body.status;
 	var avatar 				= req.body.avatar;
 	var gender 				= req.body.gender;
 	var birthday 			= req.body.birthday;
@@ -863,8 +871,8 @@ apiRoutes.put('/profile', function(req, res) {
 	var profile_description = req.body.profile_description;
 
 	if (
-		!(chkObj(avatar)) && !(chkObj(gender)) && !(chkObj(birthday))
-		&& !(chkObj(phone)) && !(chkObj(profile_description))
+		!(chkObj(status)) && !(chkObj(avatar)) && !(chkObj(gender))
+		 && !(chkObj(birthday)) && !(chkObj(phone)) && !(chkObj(profile_description))
 		)
 	{
 		console.log('User does not modify profile, no query!');
@@ -875,7 +883,17 @@ apiRoutes.put('/profile', function(req, res) {
 		return;
 	}
 
-	// STEP 1: Validate avatar
+	// STEP 1: Validate status
+	if (chkObj(status) && status == '')
+	{
+		res.json({
+			status: code_null_invalid_status,
+			message: errorMessage(code_null_invalid_status)
+		});
+		return;
+	}
+
+	// STEP 2: Validate avatar
 	if (chkObj(avatar) && avatar == '')
 	{
 		res.json({
@@ -885,7 +903,7 @@ apiRoutes.put('/profile', function(req, res) {
 		return;
 	}
 
-	// STEP 2: Validate gender
+	// STEP 3: Validate gender
 	if (chkObj(gender) && gender == '')
 	{
 		res.json({
@@ -895,7 +913,7 @@ apiRoutes.put('/profile', function(req, res) {
 		return;
 	}
 
-	// STEP 2: Validate birthday
+	// STEP 4: Validate birthday
 	if (chkObj(birthday) && (birthday == '' || validateBirthday(birthday) == false))
 	{
 		res.json({
@@ -905,7 +923,7 @@ apiRoutes.put('/profile', function(req, res) {
 		return;
 	}
 
-	// STEP 3: Validate phone
+	// STEP 5: Validate phone
 	if (chkObj(phone) && (phone == '' || validatePhone(phone) == false))
 	{
 		res.json({
@@ -915,7 +933,7 @@ apiRoutes.put('/profile', function(req, res) {
 		return;
 	}
 
-	// STEP 4: Validate profile_description
+	// STEP 6: Validate profile_description
 	if (chkObj(profile_description) && profile_description == '')
 	{
 		res.json({
@@ -944,6 +962,7 @@ apiRoutes.put('/profile', function(req, res) {
 			values: [account_id]
 		}, function(error, results, fields) {
 			if (error) {
+				connection.release();
 				res.json({
 					status: code_db_error,
 					"error" : error
@@ -951,12 +970,13 @@ apiRoutes.put('/profile', function(req, res) {
 			} else {
 				connection.query({
 					sql: 'UPDATE `profile` SET '
-					+ '`avatar`= ?,`gender`= ?,`birthday`= ?,'
+					+ '`status`= ?,`avatar`= ?,`gender`= ?,`birthday`= ?,'
 					+ '`phone`= ?,`profile_description`= ?'
 					+ ' WHERE `account_id` = ?',
 					timeout: 1000, // 1s
 					values:
 					[
+						chkObj(status) ? status 							: results[0]['status'],
 						chkObj(avatar) ? avatar 							: results[0]['avatar'],
 						chkObj(gender) ? gender 							: results[0]['gender'],
 						chkObj(birthday) ? birthday 						: results[0]['birthday'],
@@ -984,24 +1004,37 @@ apiRoutes.put('/profile', function(req, res) {
 });
 
 // ---------------------------------------------------------
-// STATUS (this is authenticated)
+// AROUND PROFILE (this is authenticated)
 // ---------------------------------------------------------
 
-// http://localhost:1234/api/status
-apiRoutes.get('/status', function(req, res) {
+// http://localhost:1234/api/aroundProfile
+apiRoutes.get('/aroundProfile', function(req, res) {
+
+	var arrayAround = [];
+	var latitude = req.body.latitude || req.param('latitude') || req.headers['latitude'];
+	var longitude = req.body.longitude || req.param('longitude') || req.headers['longitude'];
+
+	var distanceStr = '111.1111 * DEGREES(ACOS(COS(RADIANS(l.latitude))'
+	+ ' * COS(RADIANS(' + latitude + '))'
+	+ ' * COS(RADIANS(l.longitude - ' + longitude + ')) + SIN(RADIANS(l.latitude))'
+	+ ' * SIN(RADIANS(' + latitude + '))))';
+
+	var sqlQuery = 'SELECT p.profile_id, p.`status`, p.`avatar`,p.`gender`, p.`account_id`,p.`birthday`,p.`phone`,p.`profile_description`,p.`created_by`,p.`modified_by`,l.latitude,l.longitude,'
+	+ distanceStr + 'AS distance'
+	+ ' FROM `profile` p INNER JOIN `location` l ON p.account_id = l.account_id'
+	+ ' WHERE ' + distanceStr + ' <= 10'
+	+ ' ORDER BY distance ASC';
+
+	if ( !(chkObj(latitude)) || !(chkObj(longitude )))
+	{
+		res.json({
+			status: code_null_invalid_lat_long,
+			message: errorMessage(code_null_invalid_lat_long)
+		});
+		return;
+	}
+
 	pool.getConnection(function(err, connection) {
-
-		// check header or url parameters or post parameters for token
-		var status_id = req.body.status_id || req.param('status_id') || req.headers['status_id'];
-		var account_id = req.decoded['account_id'];
-		var sqlQuery = '';
-
-		if (chkObj(status_id)) { // contain status_id in request
-			sqlQuery = 'SELECT * FROM `status` WHERE `status_id` = ' + status_id;
-		} else {
-			sqlQuery = 'SELECT * FROM `status` WHERE `account_id` = ' + account_id;
-		}
-
 		if (err) {
 			res.json({
 				status: code_db_error,
@@ -1011,104 +1044,21 @@ apiRoutes.get('/status', function(req, res) {
 		}
 		connection.query({
 			sql: sqlQuery,
-			timeout: 1000, // 1s
+			timeout: 10000, // 10s
 			values: []
 		}, function(error, results, fields) {
 			connection.release();
 			if (results.length == 0 || results == null) {
 				res.json({
-					status : code_not_exist_status,
-					message : errorMessage(code_not_exist_status)
+					success : false,
+					results : []
 				});
 			} else {
-				res.json(results[0]);
-			}
-		});
-	});
-});
-
-// ---------------------------------------------------------
-// UPDATE STATUS (this is authenticated)
-// ---------------------------------------------------------
-
-// http://localhost:1234/api/status
-apiRoutes.put('/status', function(req, res) {
-
-	var status = req.body.status;
-
-	if (!(chkObj(status)))
-	{
-		console.log('User does not modify [status], no query!');
-		res.json({
-			status: code_success,
-			message: errorMessage(code_success)
-		});
-		return;
-	}
-
-	// Validate status
-	if (chkObj(status) && status == '')
-	{
-		res.json({
-			status: code_null_invalid_status,
-			message: errorMessage(code_null_invalid_status)
-		});
-		return;
-	}
-
-	// get account_id from request.token
-	var account_id = req.decoded['account_id'];
-
-	pool.getConnection(function(err, connection) {
-		if (err) {
-			res.json({
-				status: code_db_error,
-				message: "Error in connection database"
-			});
-			return;
-		}
-
-		//------------------------- UPDATE STATUS ------------------------------
-		connection.query({
-			sql: 'SELECT * FROM `status`'
-			+ ' WHERE `account_id` = ?',
-			timeout: 1000, // 1s
-			values:[account_id]
-		}, function (error, results, fields) {
-			console.log('results: ' + results[0]);
-			if (error) {
 				res.json({
-					status: code_db_error,
-					"error" : error
+					success : true,
+					results : results
 				});
-				connection.release();
-				return;
 			}
-
-			var sqlQuery = '';
-			if (results == null || results.length == 0) {
-				sqlQuery = 'INSERT INTO `status`(`content`,`account_id`) VALUES (?,?)'
-			} else {
-				sqlQuery = 'UPDATE `status` SET `content`= ? WHERE `account_id` = ?';
-			}
-			connection.query({
-				sql: sqlQuery,
-				timeout: 1000, // 1s
-				values:[status,account_id]
-			}, function (error, results, fields) {
-				connection.release();
-				if (error) {
-					res.json({
-						status: code_db_error,
-						error : error
-					});
-				} else {
-					res.json({
-						status: code_success,
-						message: errorMessage(code_success)
-					});
-				}
-			});
 		});
 	});
 });
