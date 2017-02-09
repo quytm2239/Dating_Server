@@ -741,6 +741,46 @@ apiRoutes.get('/profile', function(req, res) {
 	// check header or url parameters or post parameters for token
 	var profile_id = req.body.profile_id || req.param('profile_id') || req.headers['profile_id'];
 
+	if (!chkObj(profile_id)) {
+		profile_id = req.decoded['profile_id'];
+	}
+
+	pool.getConnection(function(err, connection) {
+		if (err) {
+			res.json({
+				"status": code_db_error,
+				"message": "Error in connection database"
+			});
+			return;
+		}
+		connection.query({
+			sql: 'SELECT * FROM `profile` WHERE `profile_id` = ?',
+			timeout: 1000, // 1s
+			values: [profile_id]
+		}, function(error, results, fields) {
+			connection.release();
+			if (results.length == 0 || results == null) {
+				res.json({
+					status : code_not_exist_profile,
+					message : errorMessage(code_not_exist_profile)
+				});
+			} else {
+				res.json(results[0]);
+			}
+		});
+	});
+});
+
+// ---------------------------------------------------------
+// PROFILE (this is authenticated)
+// ---------------------------------------------------------
+
+// http://localhost:1234/api/allProfile
+apiRoutes.get('/allProfile', function(req, res) {
+
+	// check header or url parameters or post parameters for token
+	var profile_id = req.body.profile_id || req.param('profile_id') || req.headers['profile_id'];
+
 	if (chkObj(profile_id)) {
 		var profile_id = req.decoded['profile_id'];
 	}
