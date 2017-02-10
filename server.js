@@ -307,7 +307,6 @@ apiRoutes.post('/register', function(req, res) {
 	var password 		= req.body.password;
 	var full_name 		= req.body.full_name;
 	var gender 			= req.body.gender;
-	var avatar 			= req.body.avatar;
 	var birthday 		= req.body.birthday;
 	var province 		= req.body.province;
 	var latitude 		= req.body.latitude;
@@ -316,71 +315,78 @@ apiRoutes.post('/register', function(req, res) {
 	// Validate email_login
 	if (!(chkObj(email_login)) || !(validateEmail(email_login)))
 	{
-		res.json(responseConvention(code_null_invalid_email,[]));
+		res.status(400).send(responseConvention(code_null_invalid_email,[]));
 		return;
 	}
 
 	// Validate password
 	if (!(chkObj(password))) {
-		res.json(responseConvention(code_null_invalid_password,[]));
+		res.status(400).send(responseConvention(code_null_invalid_password,[]));
 		return;
 	}
 
 	// Validate full_name
 	if (!(chkObj(full_name))) {
-		res.json(responseConvention(code_null_invalid_full_name,[]));
-		return;
-	}
-
-	// Validate avatar
-	if (!(chkObj(avatar)))
-	{
-		res.json(responseConvention(code_null_invalid_avatar,[]));
+		res.status(400).send(responseConvention(code_null_invalid_full_name,[]));
 		return;
 	}
 
 	// Validate gender
 	if (!(chkObj(gender)) || isNaN(gender) || gender < 0 || gender > 5) {
-		res.json(responseConvention(code_null_invalid_gender,[]));
+		res.status(400).send(responseConvention(code_null_invalid_gender,[]));
 		return;
 	}
 
 	// Validate birthday
 	if (!(chkObj(birthday)) || !(validateBirthday(birthday)))
 	{
-		res.json(responseConvention(code_null_invalid_birthday,[]));
+		res.status(400).send(responseConvention(code_null_invalid_birthday,[]));
 		return;
 	}
 
 	// Validate address
 	if (!(chkObj(province)))
 	{
-		res.json(responseConvention(code_null_invalid_address,[]));
+		res.status(400).send(responseConvention(code_null_invalid_address,[]));
 		return;
 	}
 
 	// Validate coordinate
 	if (!(chkObj(latitude)) || !(chkObj(longitude)) || !(validateCoordinate(latitude,longitude)))
 	{
-		res.json(responseConvention(code_null_invalid_lat_long,[]));
+		res.status(400).send(responseConvention(code_null_invalid_lat_long,[]));
 		return;
 	}
 
 	pool.getConnection(function(err, connection) {
 		if (err) {
-			res.json(responseWithMessage(code_db_error,'Error in DB connection',[]));
+			res.status(500).send(responseWithMessage(code_db_error,'Error in DB connection',[]));
 			return;
 		}
 
-		/* Begin transaction */
-		connection.beginTransaction(function(err) {
-			if (err)
-			{
-				res.json(responseWithMessage(code_db_error,err,[]));
+		// CHECK full_name if Duplicate or NOT Duplicate
+		connection.query({
+			sql: 'SELECT * FROM `account` WHERE `full_name` = ?',
+			timeout: 5000, // 5s
+			values: [full_name]
+		}, function(error, results, fields) {
+			// error -> rollback
+			if (error) {
+				res.status(500).send(responseWithMessage(code_db_error,error,[]));
+				connection.rollback(function() {
+					console.log(error);
+				});
 				connection.release();
 				return;
 			}
 
+			if (chkObj(results) && results.length > 0) { // full_name is Duplicate
+				res.status(400).send(responseConvention(code_duplicate_full_name,[]));
+				connection.release();
+				return;
+			}
+
+			// CHECK email_login if Duplicate or NOT Duplicate
 			connection.query({
 				sql: 'SELECT * FROM `account` WHERE `email_login` = ?',
 				timeout: 5000, // 5s
@@ -388,15 +394,30 @@ apiRoutes.post('/register', function(req, res) {
 			}, function(error, results, fields) {
 				// error -> rollback
 				if (error) {
-					res.json(responseWithMessage(code_db_error,error,[]));
+					res.status(500).send(responseWithMessage(code_db_error,error,[]));
 					connection.rollback(function() {
 						console.log(error);
 					});
 					connection.release();
+					return;
 				}
 
-				if (results == null || results.length == 0)
-				{
+				if (chkObj(results) && results.length > 0) { // email_login is Duplicate
+					res.status(400).send(responseConvention(code_duplicate_email,[]));
+					connection.release();
+					return;
+				}
+
+				/* PASS CHECKING -> INSERT TO DB */
+				/* Begin transaction */
+				connection.beginTransaction(function(err) {
+					if (err)
+					{
+						res.status(500).send(responseWithMessage(code_db_error,err,[]));
+						connection.release();
+						return;
+					}
+
 					//--------------STEP 1: add to table[account]-------------------
 					var insertedAccountId;
 					connection.query({
@@ -408,7 +429,7 @@ apiRoutes.post('/register', function(req, res) {
 
 						if (error) {
 							console.log('//--------------STEP 1: add to table[account]-------------------');
-							res.json(responseWithMessage(code_db_error,error,[]));
+							res.status(500).send(responseWithMessage(code_db_error,error,[]));
 							connection.rollback(function() {
 								console.log(error);
 							});
@@ -425,7 +446,7 @@ apiRoutes.post('/register', function(req, res) {
 
 								if (error) {
 									console.log('//--------------STEP 2: add to table [address]------------------');
-									res.json(responseWithMessage(code_db_error,error,[]));
+									res.status(500).send(responseWithMessage(code_db_error,error,[]));
 									connection.rollback(function() {
 										console.log(error);
 									});
@@ -442,7 +463,7 @@ apiRoutes.post('/register', function(req, res) {
 
 										if (error) {
 											console.log('//--------------STEP 3: add to table [location]-----------------');
-											res.json(responseWithMessage(code_db_error,error,[]));
+											res.status(500).send(responseWithMessage(code_db_error,error,[]));
 											connection.rollback(function() {
 												console.log(error);
 											});
@@ -451,26 +472,25 @@ apiRoutes.post('/register', function(req, res) {
 
 					//--------------STEP 4: add to table [profile]------------------
 											connection.query({
-												sql: 'INSERT INTO `profile`(`avatar`, `gender`, `account_id`, `birthday`)'
-												+ ' VALUES (?,?,?,?)',
+												sql: 'INSERT INTO `profile`(`gender`,`account_id`,`birthday`)'
+												+ ' VALUES (?,?,?)',
 												timeout: 1000, // 1s
-												values: [avatar, gender, insertedAccountId, birthday]
+												values: [gender, insertedAccountId, birthday]
 											}, function (error, results, fields) {
 
 												if (error) {
 													console.log('//--------------STEP 4: add to table [profile]------------------');
-													res.json(responseWithMessage(code_db_error,error,[]));
+													res.status(500).send(responseWithMessage(code_db_error,error,[]));
 													connection.rollback(function() {
 														console.log(error);
 													});
 													connection.release();
 												} else {
 													connection.commit(function(err) {
-														connection.release();
 														if (err)
 														{
 															console.log('Transaction Failed.');
-															res.json(responseWithMessage(code_db_error,err,[]));
+															res.status(500).send(responseWithMessage(code_db_error,err,[]));
 															connection.rollback(function() {
 																console.log(error);
 															});
@@ -478,7 +498,7 @@ apiRoutes.post('/register', function(req, res) {
 														else
 														{
 															console.log('Transaction Complete.');
-															res.json(responseConvention(code_success,[]));
+															res.status(200).send(responseConvention(code_success,[]));
 															connection.release();
 														}
 					//--------------REGISTER SUCESSFULLY----------------------------
@@ -491,15 +511,10 @@ apiRoutes.post('/register', function(req, res) {
 							});
 						}
 					});
-				}
-				else
-				{
-					connection.release();
-					res.json(responseConvention(code_duplicate_email,[]));
-				}
+				});
+				/* End transaction */
 			});
 		});
-		/* End transaction */
 	});
 });
 
@@ -517,19 +532,19 @@ apiRoutes.post('/login', function(req, res) {
 	// Validate email_login
 	if (!(chkObj(email_login)) || !(validateEmail(email_login)))
 	{
-		res.json(responseConvention(code_null_invalid_email,[]));
+		res.status(400).send(responseConvention(code_null_invalid_email,[]));
 		return;
 	}
 
 	// Validate password
 	if (!(chkObj(password))) {
-		res.json(responseConvention(code_null_invalid_password,[]));
+		res.status(400).send(responseConvention(code_null_invalid_password,[]));
 		return;
 	}
 
 	pool.getConnection(function(err, connection) {
 		if (err) {
-			res.json(responseWithMessage(code_db_error,"Error in connection database",[]));
+			res.status(500).send(responseWithMessage(code_db_error,"Error in connection database",[]));
 			return;
 		}
 		connection.query({
@@ -540,16 +555,16 @@ apiRoutes.post('/login', function(req, res) {
 			connection.release();
 
 			if (error) {
-				res.json(responseWithMessage(code_db_error,error,[]));
+				res.status(500).send(responseWithMessage(code_db_error,error,[]));
 				return;
 			}
 
 			if (results == null || results.length == 0) {
-				res.json(responseConvention(code_not_exist_email,[]));
+				res.status(400).send(responseConvention(code_not_exist_email,[]));
 			} else {
 				// found username -> check if password matches
 				if (isExactPass(password,results[0]['password']) == false) {
-					res.json(responseConvention(code_not_match_password,[]));
+					res.status(400).send(responseConvention(code_not_match_password,[]));
 				} else { // match -> create token
 					var token = jwt.sign(results[0], app.get('superSecret'), {
 						expiresIn: 86400 // expires in 24 hours
@@ -578,13 +593,13 @@ apiRoutes.post('/forgot', function(req, res) {
 	// Validate email_login
 	if (!(chkObj(email_login)) || !(validateEmail(email_login)))
 	{
-		res.json(responseConvention(code_null_invalid_email,[]));
+		res.status(400).send(responseConvention(code_null_invalid_email,[]));
 		return;
 	}
 
 	pool.getConnection(function(err, connection) {
 		if (err) {
-			res.json(responseConvention(code_null_invalid_email,'Error in connection database',[]));
+			res.status(400).send(responseConvention(code_null_invalid_email,'Error in connection database',[]));
 			return;
 		}
 
@@ -596,7 +611,7 @@ apiRoutes.post('/forgot', function(req, res) {
 
 			if (results == null || results.length == 0) { // email_login not found
 				connection.release();
-				res.json(responseConvention(code_not_exist_email,[]));
+				res.status(400).send(responseConvention(code_not_exist_email,[]));
 			} else { // found -> update new random password
 				var randomPassword = Math.random().toString(36).slice(-8);
 
@@ -609,10 +624,10 @@ apiRoutes.post('/forgot', function(req, res) {
 				}, function (error, results, fields) {
 					connection.release();
 					if (error) {
-						res.json(responseWithMessage(code_db_error,error,[]));
+						res.status(500).send(responseWithMessage(code_db_error,error,[]));
 					} else {
 						sendMailResetPass(email_login,randomPassword);
-						res.json(responseConvention(code_success,[]));
+						res.status(200).send(responseConvention(code_success,[]));
 					}
 				});
 			}
@@ -634,7 +649,7 @@ apiRoutes.use(function(req, res, next) {
         // verifies secret and checks exp
         jwt.verify(token, app.get('superSecret'), function(err, decoded) {
             if (err) {
-                return res.json({
+                return res.status(400).send({
                     status: 4031,
                     message: 'Failed to authenticate token.',
 					data: []
@@ -670,7 +685,7 @@ apiRoutes.put('/changePass', function(req, res) {
 	var new_password = req.body.new_password;
 
 	if (!(chkObj(old_password)) || !(chkObj(new_password))) {
-		res.json(responseConvention(code_null_invalid_password,[]));
+		res.status(400).send(responseConvention(code_null_invalid_password,[]));
 		return;
 	}
 
@@ -679,7 +694,7 @@ apiRoutes.put('/changePass', function(req, res) {
 
 	pool.getConnection(function(err, connection) {
 		if (err) {
-			res.json(responseWithMessage(code_db_error,'Error in connection database',[]));
+			res.status(500).send(responseWithMessage(code_db_error,'Error in connection database',[]));
 			return;
 		}
 		//------------------------ CHANGE PASSWORD -----------------------------
@@ -690,7 +705,7 @@ apiRoutes.put('/changePass', function(req, res) {
 		}, function(error, results, fields) {
 			if (isExactPass(old_password,results[0]['password']) == false) { // old_password does not match
 				connection.release();
-				res.json(responseConvention(code_wrong_old_password,[]));
+				res.status(400).send(responseConvention(code_wrong_old_password,[]));
 			} else { // Old_password matched -> update new pass
 				connection.query({
 					sql: 'UPDATE `account` '
@@ -701,9 +716,9 @@ apiRoutes.put('/changePass', function(req, res) {
 				}, function (error, results, fields) {
 					connection.release();
 					if (error) {
-						res.json(responseWithMessage(code_db_error,error,[]));
+						res.status(500).send(responseWithMessage(code_db_error,error,[]));
 					} else {
-						res.json(responseConvention(code_success,[]));
+						res.status(200).send(responseConvention(code_success,[]));
 					}
 				});
 			}
@@ -731,7 +746,7 @@ apiRoutes.get('/profile', function(req, res) {
 
 	pool.getConnection(function(err, connection) {
 		if (err) {
-			res.json(responseWithMessage(code_db_error,'Error in connection database',[]));
+			res.status(500).send(responseWithMessage(code_db_error,'Error in connection database',[]));
 			return;
 		}
 		connection.query({
@@ -741,9 +756,9 @@ apiRoutes.get('/profile', function(req, res) {
 		}, function(error, results, fields) {
 			connection.release();
 			if (results.length == 0 || results == null) { // not found record
-				res.json(responseConvention(code_not_exist_profile,[]));
+				res.status(400).send(responseConvention(code_not_exist_profile,[]));
 			} else { // found record
-				res.json(responseConvention(code_success,results));
+				res.status(200).send(responseConvention(code_success,results));
 			}
 		});
 	});
@@ -769,49 +784,49 @@ apiRoutes.put('/profile', function(req, res) {
 		)
 	{
 		console.log('User does not modify profile, no query!');
-		res.json(responseConvention(code_success,[]));
+		res.status(200).send(responseConvention(code_success,[]));
 		return;
 	}
 
 	// STEP 1: Validate status
 	if (chkObj(user_status) && user_status == '')
 	{
-		res.json(responseConvention(code_null_invalid_user_status,[]));
+		res.status(400).send(responseConvention(code_null_invalid_user_status,[]));
 		return;
 	}
 
 	// STEP 2: Validate avatar
 	if (chkObj(avatar) && avatar == '')
 	{
-		res.json(responseConvention(code_null_invalid_avatar,[]));
+		res.status(400).send(responseConvention(code_null_invalid_avatar,[]));
 		return;
 	}
 
 	// STEP 3: Validate gender
 	if (chkObj(gender) && gender == '')
 	{
-		res.json(responseConvention(code_null_invalid_gender,[]));
+		res.status(400).send(responseConvention(code_null_invalid_gender,[]));
 		return;
 	}
 
 	// STEP 4: Validate birthday
 	if (chkObj(birthday) && (birthday == '' || validateBirthday(birthday) == false))
 	{
-		res.json(responseConvention(code_null_invalid_birthday,[]));
+		res.status(400).send(responseConvention(code_null_invalid_birthday,[]));
 		return;
 	}
 
 	// STEP 5: Validate phone
 	if (chkObj(phone) && (phone == '' || validatePhone(phone) == false))
 	{
-		res.json(responseConvention(code_null_invalid_phone,[]));
+		res.status(400).send(responseConvention(code_null_invalid_phone,[]));
 		return;
 	}
 
 	// STEP 6: Validate profile_description
 	if (chkObj(profile_description) && profile_description == '')
 	{
-		res.json(responseConvention(code_null_invalid_profile_description,[]));
+		res.status(400).send(responseConvention(code_null_invalid_profile_description,[]));
 		return;
 	}
 
@@ -820,7 +835,7 @@ apiRoutes.put('/profile', function(req, res) {
 
 	pool.getConnection(function(err, connection) {
 		if (err) {
-			res.json(responseWithMessage(code_db_error,'Error in connection database',[]));
+			res.status(500).send(responseWithMessage(code_db_error,'Error in connection database',[]));
 			return;
 		}
 
@@ -832,7 +847,7 @@ apiRoutes.put('/profile', function(req, res) {
 		}, function(error, results, fields) {
 			if (error) {
 				connection.release();
-				res.json(responseWithMessage(code_db_error,error,[]));
+				res.status(500).send(responseWithMessage(code_db_error,error,[]));
 			} else {
 				connection.query({
 					sql: 'UPDATE `profile` SET '
@@ -853,9 +868,9 @@ apiRoutes.put('/profile', function(req, res) {
 				}, function (error, results, fields) {
 					connection.release();
 					if (error) {
-						res.json(responseWithMessage(code_db_error,error,[]));
+						res.status(500).send(responseWithMessage(code_db_error,error,[]));
 					} else {
-						res.json(responseConvention(code_success,[]));
+						res.status(200).send(responseConvention(code_success,[]));
 					}
 				});
 			}
@@ -890,13 +905,13 @@ apiRoutes.get('/aroundProfile', function(req, res) {
 
 	if ( !(chkObj(latitude)) || !(chkObj(longitude )))
 	{
-		res.json(responseConvention(code_null_invalid_lat_long,[]));
+		res.status(400).send(responseConvention(code_null_invalid_lat_long,[]));
 		return;
 	}
 
 	pool.getConnection(function(err, connection) {
 		if (err) {
-			res.json(responseWithMessage(code_db_error,'Error in connection database',[]));
+			res.status(500).send(responseWithMessage(code_db_error,'Error in connection database',[]));
 			return;
 		}
 		connection.query({
@@ -906,9 +921,9 @@ apiRoutes.get('/aroundProfile', function(req, res) {
 		}, function(error, results, fields) {
 			connection.release();
 			if (results.length == 0 || results == null) {
-				res.json(responseConvention(code_success,[]));
+				res.status(204).send(responseConvention(code_success,[]));
 			} else {
-				res.json(responseConvention(code_success,results));
+				res.status(200).send(responseConvention(code_success,results));
 			}
 		});
 	});
