@@ -47,6 +47,9 @@ var code_not_exist_status	= 2017;
 
 var code_not_match_password	= 2018;
 
+var code_null_invalid_page_size	= 2019;
+var code_null_invalid_page	= 2020;
+
 function errorMessage(code) {
 	var mess;
 	switch (code) {
@@ -110,6 +113,13 @@ function errorMessage(code) {
 	case code_not_match_password:
 		mess = "password does not match/wrong password";
 		break;
+
+	case code_null_invalid_page_size:
+		mess = "page_size is blank/null or not valid. (number required)";
+		break;
+	case code_null_invalid_page:
+		mess = "page is blank/null or not valid. (number required)";
+		break;
 	}
 
 	return mess;
@@ -139,7 +149,7 @@ app.use(function(req, res, next) {
 // =================================================================
 
 var pool = mysql.createPool({
-    connectionLimit: 5000, //important
+    connectionLimit: 10000, //important
     host: 'localhost',
     user: 'root',
     password: '',
@@ -886,9 +896,31 @@ apiRoutes.put('/profile', function(req, res) {
 // http://localhost:1234/api/aroundProfile
 apiRoutes.get('/aroundProfile', function(req, res) {
 
-	var arrayAround = [];
 	var latitude = req.body.latitude || req.param('latitude') || req.headers['latitude'];
 	var longitude = req.body.longitude || req.param('longitude') || req.headers['longitude'];
+	var page_size = req.body.page_size || req.param('page_size') || req.headers['page_size'];
+	var page = req.body.page || req.param('page') || req.headers['page'];
+
+	if ( !(chkObj(latitude)) || !(chkObj(longitude )) )
+	{
+		res.status(400).send(responseConvention(code_null_invalid_lat_long,[]));
+		return;
+	}
+
+	if (!(chkObj(page_size)) || isNaN(page_size))
+	{
+		res.status(400).send(responseConvention(code_null_invalid_page_size,[]));
+		return;
+	}
+
+	if (!(chkObj(page)) || isNaN(page))
+	{
+		res.status(400).send(responseConvention(code_null_invalid_page,[]));
+		return;
+	}
+
+	var limit = page_size;
+	var offset = (page - 1) * page_size;
 
 	var distanceStr = '111.1111 * DEGREES(ACOS(COS(RADIANS(l.latitude))'
 	+ ' * COS(RADIANS(' + latitude + '))'
@@ -902,13 +934,8 @@ apiRoutes.get('/aroundProfile', function(req, res) {
 	+ ' FROM `profile` p INNER JOIN `location` l ON p.account_id = l.account_id'
 	+ ' INNER JOIN `account` a ON p.account_id = a.account_id'
 	+ ' WHERE ' + distanceStr + ' <= 10'
-	+ ' ORDER BY distance ASC';
-
-	if ( !(chkObj(latitude)) || !(chkObj(longitude )))
-	{
-		res.status(400).send(responseConvention(code_null_invalid_lat_long,[]));
-		return;
-	}
+	+ ' ORDER BY distance ASC'
+	+ ' LIMIT ' + limit + ' OFFSET ' + offset;
 
 	pool.getConnection(function(err, connection) {
 		if (err) {
