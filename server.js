@@ -321,6 +321,12 @@ apiRoutes.post('/register', function(req, res) {
 	var province 		= req.body.province;
 	var latitude 		= req.body.latitude;
 	var longitude 		= req.body.longitude;
+	var district 		= req.body.district;
+	var country 		= req.body.country;
+	var phone 			= req.body.phone;
+	var profile_description	= req.body.profile_description;
+	var user_status		= req.body.user_status;
+	var avatar			= req.body.avatar;
 
 	// Validate email_login
 	if (!(chkObj(email_login)) || !(validateEmail(email_login)))
@@ -432,10 +438,10 @@ apiRoutes.post('/register', function(req, res) {
 					//--------------STEP 1: add to table[account]-------------------
 					var insertedAccountId;
 					connection.query({
-						sql: 'INSERT INTO `account`(`email_login`, `full_name`, `password`, `login_status`)'
-							+ 'VALUES (?,?,?,?)',
+						sql: 'INSERT INTO `account`(`email_login`, `password`, `login_status`)'
+							+ 'VALUES (?,?,?)',
 						timeout: 1000, // 1s
-						values: [email_login, full_name, hashPass(password), 0]
+						values: [email_login, hashPass(password), 0]
 					}, function (error, results, fields) {
 
 						if (error) {
@@ -445,78 +451,46 @@ apiRoutes.post('/register', function(req, res) {
 								console.log(error);
 							});
 							connection.release();
-						} else {
+						}
+						else
+						{
 							insertedAccountId = results.insertId; // store account.account_id is just inserted
-					//--------------STEP 2: add to table [address]------------------
+					//--------------STEP 2: add to table [profile]------------------
 							connection.query({
-								sql: 'INSERT INTO `address`(`province`, `account_id`)'
-								+ ' VALUES (?,?)',
+								sql: 'INSERT INTO `profile`(`full_name`,`user_status`,`avatar`,`gender`,'
+									+'`account_id`,`birthday`,`phone`,`profile_description`,`district`,`province`,'
+									+'`country`, `latitude`, `longitude`)'
+								+ ' VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
 								timeout: 1000, // 1s
-								values: [province, insertedAccountId]
+								values: [full_name, user_status, avatar, gender, insertedAccountId,
+									birthday, phone, profile_description, district, province, country, latitude, longitude]
 							}, function (error, results, fields) {
 
 								if (error) {
-									console.log('//--------------STEP 2: add to table [address]------------------');
+									console.log('//--------------STEP 2: add to table [profile]------------------');
 									res.status(500).send(responseWithMessage(code_db_error,error,[]));
 									connection.rollback(function() {
 										console.log(error);
 									});
 									connection.release();
 								} else {
-
-					//--------------STEP 3: add to table [location]-----------------
-									connection.query({
-										sql: 'INSERT INTO `location`(`latitude`, `longitude`, `account_id`)'
-										+ ' VALUES (?,?,?)',
-										timeout: 1000, // 1s
-										values: [latitude, longitude, insertedAccountId]
-									}, function (error, results, fields) {
-
-										if (error) {
-											console.log('//--------------STEP 3: add to table [location]-----------------');
-											res.status(500).send(responseWithMessage(code_db_error,error,[]));
+									connection.commit(function(err) {
+										if (err)
+										{
+											console.log('Transaction Failed.');
+											res.status(500).send(responseWithMessage(code_db_error,err,[]));
 											connection.rollback(function() {
 												console.log(error);
 											});
 											connection.release();
-										} else {
-
-					//--------------STEP 4: add to table [profile]------------------
-											connection.query({
-												sql: 'INSERT INTO `profile`(`gender`,`account_id`,`birthday`)'
-												+ ' VALUES (?,?,?)',
-												timeout: 1000, // 1s
-												values: [gender, insertedAccountId, birthday]
-											}, function (error, results, fields) {
-
-												if (error) {
-													console.log('//--------------STEP 4: add to table [profile]------------------');
-													res.status(500).send(responseWithMessage(code_db_error,error,[]));
-													connection.rollback(function() {
-														console.log(error);
-													});
-													connection.release();
-												} else {
-													connection.commit(function(err) {
-														if (err)
-														{
-															console.log('Transaction Failed.');
-															res.status(500).send(responseWithMessage(code_db_error,err,[]));
-															connection.rollback(function() {
-																console.log(error);
-															});
-														}
-														else
-														{
-															console.log('Transaction Complete.');
-															res.status(200).send(responseConvention(code_success,[]));
-															connection.release();
-														}
-					//--------------REGISTER SUCESSFULLY----------------------------
-													});
-												}
-											});
 										}
+										else
+										{
+											console.log('Transaction Complete.');
+											res.status(200).send(responseConvention(code_success,[]));
+											connection.release();
+										}
+					//--------------REGISTER SUCESSFULLY----------------------------
 									});
 								}
 							});
@@ -719,9 +693,7 @@ apiRoutes.put('/changePass', function(req, res) {
 				res.status(400).send(responseConvention(code_wrong_old_password,[]));
 			} else { // Old_password matched -> update new pass
 				connection.query({
-					sql: 'UPDATE `account` '
-					+ 'SET `password`= ?'
-					+ ' WHERE `account_id` = ?',
+					sql: 'UPDATE `account` SET `password`= ? WHERE `account_id` = ?',
 					timeout: 1000, // 1s
 					values: [hashPass(new_password), account_id]
 				}, function (error, results, fields) {
@@ -750,9 +722,9 @@ apiRoutes.get('/profile', function(req, res) {
 	var sqlQuery = '';
 
 	if (chkObj(profile_id)) { // contain profile_id in request
-		sqlQuery = 'SELECT * FROM `profile` WHERE `profile_id` = ?';
+		sqlQuery = 'SELECT * FROM `profile` WHERE profile_id = ?'
 	} else {
-		sqlQuery = 'SELECT * FROM `profile` WHERE `account_id` = ?';
+		sqlQuery = 'SELECT * FROM `profile` WHERE account_id = ?'
 	}
 
 	pool.getConnection(function(err, connection) {
@@ -952,19 +924,15 @@ apiRoutes.get('/aroundProfile', function(req, res) {
 	var limit = page_size;
 	var offset = (page - 1) * page_size;
 
-	var distanceStr = '111.1111 * DEGREES(ACOS(COS(RADIANS(l.latitude))'
+	var distanceStr = '111.1111 * DEGREES(ACOS(COS(RADIANS(latitude))'
 	+ ' * COS(RADIANS(' + latitude + '))'
-	+ ' * COS(RADIANS(l.longitude - ' + longitude + ')) + SIN(RADIANS(l.latitude))'
+	+ ' * COS(RADIANS(longitude - ' + longitude + ')) + SIN(RADIANS(latitude))'
 	+ ' * SIN(RADIANS(' + latitude + '))))';
 
-	var sqlQuery = 'SELECT p.profile_id, a.full_name, p.`user_status`, p.`avatar`,p.`gender`,'
-	+ 'p.`account_id`,p.`birthday`,p.`phone`,p.`profile_description`,'
-	+ 'p.`created_by`,p.`modified_by`,l.latitude,l.longitude,'
-	+ distanceStr + 'AS distance'
-	+ ' FROM `profile` p INNER JOIN `location` l ON p.account_id = l.account_id'
-	+ ' INNER JOIN `account` a ON p.account_id = a.account_id'
+	var sqlQuery = 'SELECT * ,' + distanceStr + 'AS distance'
+	+ ' FROM `profile`'
 	+ ' WHERE ' + distanceStr + ' <= 10'
-	+ ((chkObj(gender) && !(isNaN(gender))) ? ' AND p.`gender` = ' + gender : '')
+	+ ((chkObj(gender) && !(isNaN(gender))) ? ' AND `gender` = ' + gender : '')
 	+ ' ORDER BY distance ASC'
 	+ ' LIMIT ' + limit + ' OFFSET ' + offset;
 
