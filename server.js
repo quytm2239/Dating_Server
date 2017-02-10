@@ -69,7 +69,7 @@ function errorMessage(code) {
 		mess = "user_status is blank/null or not valid.";
 		break;
 	case code_null_invalid_gender:
-		mess = "gender is blank or not valid (number is valid).";
+		mess = "gender is blank or not valid (number is valid, 0 - Male, 1 - Female).";
 		break;
 	case code_null_invalid_avatar:
 		mess = "avatar is blank/null or not valid.";
@@ -901,6 +901,8 @@ apiRoutes.get('/aroundProfile', function(req, res) {
 	var page_size = req.body.page_size || req.param('page_size') || req.headers['page_size'];
 	var page = req.body.page || req.param('page') || req.headers['page'];
 
+	var gender = req.body.gender || req.param('gender') || req.headers['gender'];
+
 	if ( !(chkObj(latitude)) || !(chkObj(longitude )) )
 	{
 		res.status(400).send(responseConvention(code_null_invalid_lat_long,[]));
@@ -913,12 +915,25 @@ apiRoutes.get('/aroundProfile', function(req, res) {
 		return;
 	}
 
-	if (!(chkObj(page)) || isNaN(page))
+	if (!(chkObj(page)) || isNaN(page) || ( isNaN(page) == false && page <= 0))
 	{
 		res.status(400).send(responseConvention(code_null_invalid_page,[]));
 		return;
 	}
 
+	if (chkObj(gender))
+	{
+		if (isNaN(gender))
+		{
+			res.status(400).send(responseConvention(code_null_invalid_gender,[]));
+			return;
+		}
+		else if (gender != 0 && gender != 1)
+		{
+			res.status(400).send(responseConvention(code_null_invalid_gender,[]));
+			return;
+		}
+	}
 	var limit = page_size;
 	var offset = (page - 1) * page_size;
 
@@ -934,6 +949,7 @@ apiRoutes.get('/aroundProfile', function(req, res) {
 	+ ' FROM `profile` p INNER JOIN `location` l ON p.account_id = l.account_id'
 	+ ' INNER JOIN `account` a ON p.account_id = a.account_id'
 	+ ' WHERE ' + distanceStr + ' <= 10'
+	+ ((chkObj(gender) && !(isNaN(gender))) ? ' AND p.`gender` = ' + gender : '')
 	+ ' ORDER BY distance ASC'
 	+ ' LIMIT ' + limit + ' OFFSET ' + offset;
 
