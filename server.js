@@ -799,6 +799,21 @@ apiRoutes.put('/profile', function(req, res) {
 		return;
 	}
 
+	// STEP 4: Validate birthday
+	if (chkObj(birthday) && validateBirthday(birthday) == false)
+	{
+		res.status(400).send(responseConvention(code_null_invalid_birthday,[]));
+		return;
+	}
+
+	// STEP 5: Validate phone
+	if (chkObj(phone) && validatePhone(phone) == false)
+	{
+		res.status(400).send(responseConvention(code_null_invalid_phone,[]));
+		return;
+	}
+
+	/*
 	// STEP 1: Validate status
 	if (chkObj(user_status) && user_status == '')
 	{
@@ -840,7 +855,7 @@ apiRoutes.put('/profile', function(req, res) {
 		res.status(400).send(responseConvention(code_null_invalid_profile_description,[]));
 		return;
 	}
-
+	*/
 	// get account_id from request.token
 	var account_id = req.decoded['account_id'];
 
