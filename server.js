@@ -36,7 +36,7 @@ var code_null_invalid_address	= 2009;
 var code_null_invalid_phone	= 2010;
 var code_null_invalid_profile_description	= 2011;
 
-var code_duplicate_email	= 2012;
+var code_duplicate_email_login	= 2012;
 var code_duplicate_full_name	= 2013;
 
 var code_wrong_old_password	= 2014;
@@ -87,8 +87,8 @@ function errorMessage(code) {
 		mess = "profile_description is blank/null or not valid.";
 		break;
 
-	case code_duplicate_email:
-		mess = "email already exist";
+	case code_duplicate_email_login:
+		mess = "email_login already exist";
 		break;
 	case code_duplicate_full_name:
 		mess = "full_name already exist";
@@ -364,11 +364,11 @@ apiRoutes.post('/register', function(req, res) {
 			return;
 		}
 
-		// CHECK full_name if Duplicate or NOT Duplicate
+		// CHECK [email_login] if Duplicate or NOT Duplicate
 		connection.query({
-			sql: 'SELECT * FROM `account` WHERE `full_name` = ?',
+			sql: 'SELECT * FROM `account` WHERE `email_login` = ?',
 			timeout: 5000, // 5s
-			values: [full_name]
+			values: [email_login]
 		}, function(error, results, fields) {
 			// error -> rollback
 			if (error) {
@@ -380,17 +380,17 @@ apiRoutes.post('/register', function(req, res) {
 				return;
 			}
 
-			if (chkObj(results) && results.length > 0) { // full_name is Duplicate
-				res.status(400).send(responseConvention(code_duplicate_full_name,[]));
+			if (chkObj(results) && results.length > 0) { // [email_login] is Duplicate
+				res.status(400).send(responseConvention(code_duplicate_email_login,[]));
 				connection.release();
 				return;
 			}
 
-			// CHECK email_login if Duplicate or NOT Duplicate
+			// CHECK [full_name] if Duplicate or NOT Duplicate
 			connection.query({
-				sql: 'SELECT * FROM `account` WHERE `email_login` = ?',
+				sql: 'SELECT * FROM `account` WHERE `full_name` = ?',
 				timeout: 5000, // 5s
-				values: [email_login]
+				values: [full_name]
 			}, function(error, results, fields) {
 				// error -> rollback
 				if (error) {
@@ -402,14 +402,15 @@ apiRoutes.post('/register', function(req, res) {
 					return;
 				}
 
-				if (chkObj(results) && results.length > 0) { // email_login is Duplicate
-					res.status(400).send(responseConvention(code_duplicate_email,[]));
+				if (chkObj(results) && results.length > 0) { // [full_name] is Duplicate
+					res.status(400).send(responseConvention(code_duplicate_full_name,[]));
 					connection.release();
 					return;
 				}
 
 				/* PASS CHECKING -> INSERT TO DB */
 				/* Begin transaction */
+				console.log('Transaction Start!');
 				connection.beginTransaction(function(err) {
 					if (err)
 					{
